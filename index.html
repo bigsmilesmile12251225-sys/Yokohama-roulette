@@ -93,11 +93,9 @@
   .board-head .count b { font-size: 28px; color: var(--white); margin-right: 2px; }
   #chipsWrap { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; margin: 6px 0 8px; padding: 2px; -webkit-overflow-scrolling: touch; }
   #chips {
-    --cols: 3;
     --fs: 16px;
     display: grid;
-    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-    grid-auto-flow: row dense;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 5px;
     font-size: var(--fs);
   }
@@ -115,7 +113,6 @@
   }
   .chip.wrap { white-space: normal; overflow-wrap: anywhere; }
   .chip.dup { background: #ffe1e5; border-color: var(--red); color: var(--red-dark); }
-  .chip.wide { grid-column: span 2; }
   @keyframes pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
   #emptyMsg {
     height: 100%;
@@ -541,36 +538,23 @@ function renderChips(animate) {
   fitChips();
 }
 
-// 人数に応じて、札の文字サイズと列数を選ぶ（名前は必ずフルネームで表示する）
+// 札は名前の長さに関係なく1行に2枚。文字サイズは全員そろえ、名前は必ずフルネームで表示する
 const MIN_CHIP_FS = 16;
 function fitChips() {
   const n = state.names.length;
   if (!n || !$('setup').classList.contains('active')) return;
   const kids = [...chipsEl.children];
-  const colsList = n <= 6 ? [1, 2] : [2, 3];
-  const apply = (cols, fs) => {
-    chipsEl.style.setProperty('--cols', cols);
+  const apply = (fs) => {
     chipsEl.style.setProperty('--fs', fs + 'px');
-    kids.forEach((c) => c.classList.remove('wide', 'wrap'));
-    // 1マスに入らない長い名前は、2マス分の幅を使う
-    if (cols > 1) kids.filter((c) => !nameFits(c)).forEach((c) => c.classList.add('wide'));
+    kids.forEach((c) => c.classList.remove('wrap'));
   };
-  const allFit = () => kids.every(nameFits);
-  const noScroll = () => chipsWrap.scrollHeight <= chipsWrap.clientHeight + 1;
   // 1) スクロールなしで全員が1行に収まる、いちばん大きな文字
-  for (let fs = 26; fs >= MIN_CHIP_FS; fs--) {
-    for (const cols of colsList) {
-      apply(cols, fs);
-      if (allFit() && noScroll()) return;
-    }
+  for (let fs = 26; fs > MIN_CHIP_FS; fs--) {
+    apply(fs);
+    if (kids.every(nameFits) && chipsWrap.scrollHeight <= chipsWrap.clientHeight + 1) return;
   }
-  // 2) 収まらなければ、読みやすい大きさのままスクロールする（列はなるべく多く）
-  for (const cols of [...colsList].reverse()) {
-    apply(cols, MIN_CHIP_FS);
-    if (allFit()) return;
-  }
-  // 3) それでも1行に入らない名前は、札の中で折り返す
-  apply(colsList[0], MIN_CHIP_FS);
+  // 2) 収まらなければ読みやすい大きさのままスクロールし、1行に入らない名前は札の中で折り返す
+  apply(MIN_CHIP_FS);
   kids.filter((c) => !nameFits(c)).forEach((c) => c.classList.add('wrap'));
 }
 
