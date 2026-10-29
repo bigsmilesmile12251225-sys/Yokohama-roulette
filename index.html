@@ -23,156 +23,194 @@
     --white: #ffffff;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
   body {
-    min-height: 100vh;
     font-family: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
-    background: linear-gradient(180deg, #071d38 0%, #0b3d73 45%, #0e5fa8 100%) fixed;
     background-color: var(--navy);
     color: var(--white);
     -webkit-text-size-adjust: 100%;
     touch-action: manipulation;
   }
-  body.lock { overflow: hidden; position: fixed; inset: 0; }
   button { font-family: inherit; touch-action: manipulation; -webkit-user-select: none; user-select: none; cursor: pointer; }
   button:disabled { cursor: default; }
+  [hidden] { display: none !important; }
 
-  /* ---------- 設定画面 ---------- */
+  /* ---------- 設定（エントリー）画面 ---------- */
   #setup {
     display: none;
-    max-width: 560px;
-    margin: 0 auto;
-    padding: calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 28px);
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(180deg, #071d38 0%, #0b3d73 45%, #0e5fa8 100%);
+    background-size: cover;
+    background-position: center bottom;
   }
   #setup.active { display: block; }
-  .title { text-align: center; margin: 4px 0 6px; }
+  .setup-inner {
+    height: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 12px);
+  }
+  .title { text-align: center; flex: none; }
   .title .sub {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
     color: var(--gold2);
     font-weight: 700;
-    font-size: 17px;
+    font-size: 15px;
     letter-spacing: .15em;
-    padding: 0 14px;
-    border-left: 2px solid var(--gold);
-    border-right: 2px solid var(--gold);
   }
+  .title .sub::before, .title .sub::after { content: ""; width: 34px; height: 2px; background: var(--gold); }
   .title h1 {
-    margin: 6px 0 0;
-    font-size: 30px;
+    margin: 2px 0 0;
+    font-size: clamp(22px, 7.2vw, 32px);
     line-height: 1.25;
     font-weight: 900;
-    letter-spacing: .04em;
+    letter-spacing: .03em;
+    white-space: nowrap;
     text-shadow: 0 2px 0 var(--navy), 0 0 14px rgba(246, 215, 122, .35);
   }
   .title h1 .accent { color: var(--gold2); }
-  .card {
+
+  .board {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: rgba(3, 18, 40, .62);
+    border: 3px solid var(--gold);
+    border-radius: 20px;
+    padding: 10px 10px 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+  }
+  .board-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px; flex: none; }
+  .board-head .label { color: var(--gold2); font-size: 19px; font-weight: 900; letter-spacing: .12em; }
+  .board-head .count { font-size: 16px; font-weight: 800; }
+  .board-head .count b { font-size: 28px; color: var(--white); margin-right: 2px; }
+  #chipsWrap { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; margin: 6px 0 8px; padding: 2px; -webkit-overflow-scrolling: touch; }
+  #chips {
+    --cols: 3;
+    --fs: 16px;
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    grid-auto-flow: row dense;
+    gap: 5px;
+    font-size: var(--fs);
+  }
+  .chip {
     background: var(--white);
     color: var(--navy);
-    border-radius: 18px;
-    padding: 16px;
-    margin-top: 14px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
-    border-top: 6px solid var(--marine);
-  }
-  .card h2 {
-    margin: 0 0 10px;
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .count-badge {
-    background: var(--marine);
-    color: var(--white);
+    border: 2px solid var(--gold);
     border-radius: 999px;
-    padding: 4px 14px;
-    font-size: 16px;
+    padding: .26em .4em;
+    font-weight: 800;
+    text-align: center;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.25;
+    animation: pop .35s ease-out both;
   }
-  .count-badge b { font-size: 22px; margin: 0 2px; }
-  textarea {
-    width: 100%;
-    height: 38vh;
-    min-height: 200px;
-    font-size: 16px; /* 16px未満だとiPhoneで自動ズームする */
+  .chip.dup { background: #ffe1e5; border-color: var(--red); color: var(--red-dark); }
+  .chip.wide { grid-column: span 2; }
+  @keyframes pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+  #emptyMsg {
+    height: 100%;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 2px dashed rgba(246, 215, 122, .6);
+    border-radius: 14px;
+    color: var(--sky);
+    text-align: center;
+    font-size: 15px;
     line-height: 1.6;
-    color: var(--navy);
-    border: 2px solid #b9d3ea;
-    border-radius: 12px;
     padding: 12px;
-    resize: vertical;
-    background: #f7fbff;
-    font-family: inherit;
   }
-  textarea:focus { outline: none; border-color: var(--marine); }
-  .help { font-size: 13px; color: #47617d; margin: 8px 0 0; line-height: 1.5; }
-  .warn {
-    margin-top: 10px;
+  #emptyMsg .big { font-size: 22px; font-weight: 900; color: var(--gold2); }
+  #dupWarn {
+    flex: none;
+    margin-bottom: 8px;
     background: #fdecee;
     border: 2px solid var(--red);
     color: var(--red-dark);
     border-radius: 12px;
-    padding: 10px 12px;
-    font-size: 15px;
-    font-weight: 700;
-    line-height: 1.5;
-  }
-  .warn ul { margin: 6px 0 0; padding-left: 1.2em; font-weight: 600; }
-  .info {
-    margin-top: 10px;
-    background: var(--sky);
-    border-radius: 12px;
-    padding: 10px 12px;
+    padding: 6px 10px;
     font-size: 14px;
-    line-height: 1.55;
-    color: var(--navy);
-  }
-  .small-btn {
-    margin-top: 10px;
-    background: var(--sky);
-    color: var(--marine);
-    border: 2px solid #b9d3ea;
-    border-radius: 999px;
-    padding: 8px 16px;
-    font-size: 15px;
     font-weight: 700;
-    min-height: 44px;
+    line-height: 1.45;
   }
-  .stepper {
+  .board-actions { display: flex; gap: 8px; flex: none; }
+  .paste-btn {
+    flex: 1;
+    min-height: 52px;
+    border-radius: 26px;
+    border: 2px solid var(--gold2);
+    background: linear-gradient(180deg, #f6d77a, #e3b341);
+    color: var(--navy);
+    font-size: 18px;
+    font-weight: 900;
+  }
+  .edit-btn {
+    flex: none;
+    min-height: 52px;
+    padding: 0 18px;
+    border-radius: 26px;
+    border: 2px solid rgba(255, 255, 255, .7);
+    background: rgba(255, 255, 255, .12);
+    color: var(--white);
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .panel {
+    flex: none;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
-    gap: 14px;
+    justify-content: space-between;
+    gap: 4px 12px;
+    background: rgba(255, 255, 255, .96);
+    color: var(--navy);
+    border-radius: 16px;
+    padding: 6px 12px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
   }
+  .panel-item { display: flex; align-items: center; gap: 8px; min-height: 52px; }
+  .panel-item .name { font-size: 16px; font-weight: 800; white-space: nowrap; }
+  .panel-item .note { display: block; font-size: 11px; font-weight: 600; color: #5a7590; }
+  .panel-item.bgm { flex-direction: column; gap: 2px; min-height: 0; }
+  .panel-item.bgm .name { font-size: 12px; color: #5a7590; }
+  .stepper { display: flex; align-items: center; gap: 8px; }
   .stepper button {
-    width: 64px;
-    height: 64px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     border: 3px solid var(--gold);
     background: var(--marine);
     color: var(--white);
-    font-size: 34px;
+    font-size: 28px;
     font-weight: 900;
     line-height: 1;
   }
   .stepper button:disabled { background: #c8d6e3; border-color: #dde5ec; color: #f2f5f8; }
-  .stepper .value { min-width: 110px; text-align: center; font-size: 22px; font-weight: 800; }
-  .stepper .value b { font-size: 48px; color: var(--red); margin-right: 4px; }
+  .stepper .value { min-width: 60px; text-align: center; font-size: 16px; font-weight: 800; }
+  .stepper .value b { font-size: 32px; color: var(--red); margin-right: 2px; }
 
-  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .switch { position: relative; display: inline-block; width: 72px; height: 42px; flex: none; }
+  .switch { position: relative; display: inline-block; width: 56px; height: 34px; flex: none; }
   .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
-  .switch .slider {
-    position: absolute; inset: 0;
-    background: #c8d6e3;
-    border-radius: 999px;
-    transition: background .2s;
-  }
+  .switch .slider { position: absolute; inset: 0; background: #c8d6e3; border-radius: 999px; transition: background .2s; }
   .switch .slider::before {
     content: "";
     position: absolute;
-    width: 34px; height: 34px;
+    width: 26px; height: 26px;
     left: 4px; top: 4px;
     background: var(--white);
     border-radius: 50%;
@@ -180,29 +218,25 @@
     transition: transform .2s;
   }
   .switch input:checked + .slider { background: var(--red); }
-  .switch input:checked + .slider::before { transform: translateX(30px); }
-  .switch input:disabled + .slider { opacity: .5; }
-  details { margin-top: 10px; font-size: 14px; line-height: 1.6; }
-  details summary { font-weight: 800; color: var(--marine); padding: 6px 0; min-height: 36px; }
-  details ol { margin: 4px 0 0; padding-left: 1.4em; }
+  .switch input:checked + .slider::before { transform: translateX(22px); }
 
   .go-btn {
     display: block;
     width: 100%;
-    margin-top: 20px;
-    min-height: 72px;
-    border-radius: 36px;
+    min-height: 66px;
+    border-radius: 33px;
     border: 3px solid var(--gold);
     background: linear-gradient(180deg, #e8384e, var(--red-dark));
     color: var(--white);
     font-size: 24px;
     font-weight: 900;
     letter-spacing: .08em;
-    box-shadow: 0 6px 0 #6e0f1c, 0 10px 18px rgba(0, 0, 0, .3);
+    box-shadow: 0 5px 0 #6e0f1c, 0 9px 16px rgba(0, 0, 0, .3);
   }
-  .go-btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 2px 0 #6e0f1c, 0 4px 10px rgba(0, 0, 0, .3); }
+  .go-btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 #6e0f1c, 0 4px 10px rgba(0, 0, 0, .3); }
   .go-btn:disabled { background: #8aa3bb; border-color: #a9bccf; box-shadow: none; color: #e6edf3; }
-  .reason { text-align: center; margin-top: 10px; font-size: 14px; color: var(--gold2); font-weight: 700; min-height: 1.2em; }
+  #goBtn { flex: none; min-height: 60px; }
+  #goReason { flex: none; text-align: center; font-size: 13px; color: var(--gold2); font-weight: 700; margin-top: -4px; }
 
   /* ---------- 抽選画面 ---------- */
   #lottery {
@@ -210,7 +244,7 @@
     position: fixed;
     inset: 0;
     flex-direction: column;
-    padding: calc(env(safe-area-inset-top) + 6px) 8px 0;
+    padding: calc(env(safe-area-inset-top) + 6px) 8px calc(env(safe-area-inset-bottom) + 8px);
     background: var(--navy);
   }
   #lottery.active { display: flex; }
@@ -221,77 +255,25 @@
     border-radius: 14px;
     box-shadow: 0 0 0 2px rgba(227, 179, 65, .6), 0 8px 24px rgba(0, 0, 0, .5);
     -webkit-user-select: none; user-select: none;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
   }
-  #controls {
-    flex: none;
-    width: 100%;
-    max-width: 520px;
-    margin: 0 auto;
-    padding: 8px 8px calc(env(safe-area-inset-bottom) + 10px);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  #ctrlMsg { min-height: 1.3em; text-align: center; font-size: 14px; font-weight: 700; color: var(--gold2); line-height: 1.35; }
-  #ctrlMsg.error { color: #ffb3bd; }
-  .rec-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ff3b4f; margin-right: 6px; vertical-align: middle; animation: blink 1s infinite; }
-  @keyframes blink { 50% { opacity: .2; } }
-  #mainBtn { margin-top: 0; min-height: 76px; font-size: 28px; }
-  .sub-row { display: flex; gap: 8px; }
-  .sub-btn {
-    flex: 1;
-    min-height: 50px;
-    border-radius: 25px;
-    border: 2px solid rgba(255, 255, 255, .6);
-    background: rgba(255, 255, 255, .12);
-    color: var(--white);
-    font-size: 16px;
-    font-weight: 800;
-  }
-  .sub-btn.save { background: var(--gold); border-color: var(--gold2); color: var(--navy); }
-  .sub-btn.bgm { flex: 0 0 auto; padding: 0 14px; }
-  .sub-btn.bgm[aria-pressed="false"] { opacity: .6; }
-  [hidden] { display: none !important; }
-  #stage { touch-action: manipulation; -webkit-touch-callout: none; }
-
-  /* すっきり表示（画面収録向け）：ボタンを隠し、ルーレットをタップして進める */
-  body.clean #controls { display: none; }
-  body.clean #lottery { padding-bottom: env(safe-area-inset-bottom); }
-  #toast {
-    position: fixed;
-    left: 50%;
-    top: calc(env(safe-area-inset-top) + 14px);
-    transform: translateX(-50%);
-    z-index: 20;
-    max-width: calc(100% - 32px);
-    background: rgba(3, 14, 32, .9);
-    color: var(--white);
-    border: 2px solid var(--gold);
-    border-radius: 14px;
-    padding: 10px 14px;
-    font-size: 15px;
-    font-weight: 700;
-    line-height: 1.45;
-    text-align: center;
-    pointer-events: none;
-  }
-  #toast.error { border-color: #ff6b7d; color: #ffd0d6; }
-  .menu-box .small-btn { width: 100%; }
-  .divider { border: none; border-top: 2px dashed #c8d6e3; margin: 14px 0; }
-  #diagText {
-    text-align: left;
-    white-space: pre-wrap;
-    word-break: break-all;
-    font-size: 11px;
-    line-height: 1.4;
-    background: #f2f6fa;
-    border-radius: 8px;
-    padding: 8px;
-    max-height: 30vh;
-    overflow-y: auto;
+  #menuBtn {
+    position: absolute;
+    top: calc(env(safe-area-inset-top) + 10px);
+    right: 12px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, .35);
+    background: rgba(3, 14, 32, .35);
+    color: rgba(255, 255, 255, .7);
+    font-size: 22px;
+    line-height: 1;
+    opacity: .6;
   }
 
-  /* ---------- 動画モーダル ---------- */
+  /* ---------- モーダル・トースト ---------- */
   .modal {
     position: fixed;
     inset: 0;
@@ -315,88 +297,110 @@
     text-align: center;
   }
   .modal-box h2 { margin: 0 0 10px; font-size: 20px; }
-  .modal-box video { width: 100%; max-height: 42vh; background: #000; border-radius: 10px; }
-  .modal-box .go-btn { margin-top: 12px; min-height: 60px; font-size: 19px; }
-  .modal-box .small-btn { width: 100%; }
-  .modal-box .help { text-align: left; }
+  .modal-box .go-btn { margin-top: 12px; min-height: 56px; font-size: 19px; }
+  .help { font-size: 13px; color: #47617d; margin: 0 0 8px; line-height: 1.5; text-align: left; }
+  .small-btn {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    background: var(--sky);
+    color: var(--marine);
+    border: 2px solid #b9d3ea;
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 16px;
+    font-weight: 700;
+    min-height: 48px;
+  }
+  textarea {
+    width: 100%;
+    height: 38vh;
+    min-height: 160px;
+    font-size: 16px; /* 16px未満だとiPhoneで自動ズームする */
+    line-height: 1.6;
+    color: var(--navy);
+    border: 2px solid #b9d3ea;
+    border-radius: 12px;
+    padding: 10px 12px;
+    resize: none;
+    background: #f7fbff;
+    font-family: inherit;
+  }
+  textarea:focus { outline: none; border-color: var(--marine); }
+  .modal-row { display: flex; gap: 8px; }
+  .modal-row .small-btn { flex: 1; }
+  #toast {
+    position: fixed;
+    left: 50%;
+    top: calc(env(safe-area-inset-top) + 14px);
+    transform: translateX(-50%);
+    z-index: 20;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    background: rgba(3, 14, 32, .92);
+    color: var(--white);
+    border: 2px solid var(--gold);
+    border-radius: 14px;
+    padding: 10px 14px;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.45;
+    text-align: center;
+    pointer-events: none;
+  }
+  #toast.error { border-color: #ff6b7d; color: #ffd0d6; }
 </style>
 </head>
 <body>
 
-<!-- ===== 設定画面 ===== -->
+<!-- ===== 設定（エントリー）画面 ===== -->
 <main id="setup" class="active">
-  <header class="title">
-    <div class="sub">横浜バス旅行</div>
-    <h1><span class="accent">ハーバー</span>争奪<br>ルーレット</h1>
-  </header>
+  <div class="setup-inner">
+    <header class="title">
+      <div class="sub">横浜バス旅行</div>
+      <h1><span class="accent">ハーバー</span>争奪ルーレット</h1>
+    </header>
 
-  <section class="card">
-    <h2>
-      <span>① 参加者の名前</span>
-      <span class="count-badge">現在 <b id="count">0</b>名</span>
-    </h2>
-    <textarea id="names" placeholder="参加者A&#10;参加者B&#10;参加者C&#10;…&#10;（メモ帳からコピーして貼り付け／1行に1名）" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
-    <p class="help">1行に1名ずつ入力します。空行や前後のスペースは自動で無視します。名前は保存されず、ページを閉じると消えます。</p>
-    <div id="dupWarn" class="warn" hidden></div>
-    <button id="clearBtn" class="small-btn" type="button">入力をクリア</button>
-  </section>
+    <section class="board" aria-label="エントリー一覧">
+      <div class="board-head">
+        <span class="label">エントリー</span>
+        <span class="count"><b id="count">0</b>名</span>
+      </div>
+      <div id="chipsWrap">
+        <div id="emptyMsg">
+          <span class="big">参加者を募集中！</span>
+          <span>メモで名前（1行に1名）をコピーして<br>「名前を貼り付け」を押してください</span>
+        </div>
+        <div id="chips"></div>
+      </div>
+      <div id="dupWarn" hidden></div>
+      <div class="board-actions">
+        <button id="pasteBtn" class="paste-btn" type="button">📋 名前を貼り付け</button>
+        <button id="editBtn" class="edit-btn" type="button">✎ 編集</button>
+      </div>
+    </section>
 
-  <section class="card">
-    <h2><span>② 当選人数</span></h2>
-    <div class="stepper">
-      <button id="minusBtn" type="button" aria-label="当選人数を減らす">−</button>
-      <div class="value"><b id="target">5</b>名</div>
-      <button id="plusBtn" type="button" aria-label="当選人数を増やす">＋</button>
-    </div>
-    <p class="help" style="text-align:center">1〜10名（参加者数まで）</p>
-    <div id="targetNote" class="info" hidden></div>
-  </section>
+    <section class="panel">
+      <div class="panel-item">
+        <span class="name">当選人数<span id="targetNote" class="note" hidden></span></span>
+        <div class="stepper">
+          <button id="minusBtn" type="button" aria-label="当選人数を減らす">−</button>
+          <div class="value"><b id="target">5</b>名</div>
+          <button id="plusBtn" type="button" aria-label="当選人数を増やす">＋</button>
+        </div>
+      </div>
+      <div class="panel-item bgm">
+        <span class="name">♪ BGM</span>
+        <label class="switch">
+          <input id="bgmToggle" type="checkbox" aria-label="BGM" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </section>
 
-  <section class="card">
-    <div class="switch-row">
-      <h2 style="margin:0"><span>③ BGM</span></h2>
-      <label class="switch">
-        <input id="bgmToggle" type="checkbox" aria-label="BGM" checked>
-        <span class="slider"></span>
-      </label>
-    </div>
-    <p class="help">港をイメージしたゆったりしたBGMを流します。ルーレットが回っている間はBGMを止めて、ドラムロールで盛り上げます。抽選画面の「BGM」ボタンでも切り替えられます。</p>
-  </section>
-
-  <section class="card">
-    <div class="switch-row">
-      <h2 style="margin:0"><span>④ 録画モード</span></h2>
-      <label class="switch">
-        <input id="recToggle" type="checkbox" aria-label="録画モード">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <p class="help">オンにすると、最初のスタートから当選者一覧まで、ルーレットの映像と効果音を1本の動画に録画します（ボタン類は映りません）。</p>
-    <div id="recStatus" class="info"></div>
-    <details id="screenRecHelp">
-      <summary>iPhoneの「画面収録」の使い方</summary>
-      <ol>
-        <li>画面の右上から下にスワイプして「コントロールセンター」を開きます。</li>
-        <li>「画面収録」ボタン（●の形）をタップします。3秒後に収録が始まります。</li>
-        <li>コントロールセンターを閉じて、このページで抽選します。</li>
-        <li>終わったら、画面上部の赤い表示（またはダイナミックアイランド）をタップして「停止」します。</li>
-        <li>動画は「写真」アプリに保存されます。</li>
-      </ol>
-      <p class="help">「画面収録」ボタンがない場合は、コントロールセンターを開いて左上の「＋」をタップし、「コントロールを追加」から「画面収録」を追加します（古いiOSでは「設定」→「コントロールセンター」で追加）。</p>
-    </details>
-    <hr class="divider">
-    <div class="switch-row">
-      <h2 style="margin:0;font-size:16px"><span>画面収録向けのすっきり表示</span></h2>
-      <label class="switch">
-        <input id="cleanToggle" type="checkbox" aria-label="画面収録向けのすっきり表示">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <p class="help">オンにすると抽選画面のボタンを隠し、<b>ルーレットをタップ</b>してスタート・次へ進みます。iPhoneの「画面収録」で、ボタンの映らない動画を確実に録れます。<b>長押し</b>でメニュー（BGM・やり直し など）を開きます。</p>
-  </section>
-
-  <button id="goBtn" class="go-btn" type="button" disabled>抽選へ進む</button>
-  <div id="goReason" class="reason"></div>
+    <button id="goBtn" class="go-btn" type="button" disabled>抽選スタート！</button>
+    <div id="goReason"></div>
+  </div>
 </main>
 
 <!-- ===== 抽選画面 ===== -->
@@ -404,43 +408,28 @@
   <div id="stageWrap">
     <canvas id="stage" width="720" height="1280"></canvas>
   </div>
-  <div id="controls">
-    <div id="ctrlMsg"></div>
-    <button id="mainBtn" class="go-btn" type="button">スタート</button>
-    <div class="sub-row">
-      <button id="saveBtn" class="sub-btn save" type="button" hidden>動画を保存</button>
-      <button id="bgmBtn" class="sub-btn bgm" type="button" aria-pressed="true">♪ BGM オン</button>
-      <button id="resetBtn" class="sub-btn" type="button">最初からやり直す</button>
-    </div>
-  </div>
+  <button id="menuBtn" type="button" aria-label="メニュー">≡</button>
 </div>
 
-<!-- ===== 録画完了モーダル ===== -->
-<div id="videoModal" class="modal" hidden>
+<!-- ===== 名前の編集 ===== -->
+<div id="editModal" class="modal" hidden>
   <div class="modal-box">
-    <h2>録画が完了しました</h2>
-    <video id="preview" controls playsinline></video>
-    <button id="shareBtn" class="go-btn" type="button">写真に保存・共有する</button>
-    <p class="help">共有メニューの「ビデオを保存」を選ぶと「写真」アプリに保存されます。LINEなどへ直接送ることもできます。</p>
-    <button id="downloadBtn" class="small-btn" type="button">ファイルとしてダウンロード</button>
-    <p class="help">ダウンロードした動画は「ファイル」アプリの「ダウンロード」フォルダに入ります。</p>
-    <p id="modalMsg" class="help" style="color:#a8172b;font-weight:700"></p>
-    <details id="diagBox">
-      <summary>診断情報（不具合の報告用）</summary>
-      <pre id="diagText"></pre>
-      <button id="copyDiagBtn" class="small-btn" type="button">診断情報をコピー</button>
-    </details>
-    <button id="closeModalBtn" class="small-btn" type="button">閉じる</button>
+    <h2>名前の編集</h2>
+    <p id="editHint" class="help">1行に1名ずつ入力します。空行や前後のスペースは自動で無視します。</p>
+    <textarea id="names" placeholder="参加者A&#10;参加者B&#10;参加者C" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+    <div class="modal-row">
+      <button id="editClearBtn" class="small-btn" type="button">すべて消す</button>
+      <button id="editCancelBtn" class="small-btn" type="button">キャンセル</button>
+    </div>
+    <button id="editDoneBtn" class="go-btn" type="button">決定</button>
   </div>
 </div>
 
-<!-- ===== メニュー（すっきり表示で長押ししたとき） ===== -->
+<!-- ===== メニュー ===== -->
 <div id="menuModal" class="modal" hidden>
-  <div class="modal-box menu-box">
+  <div class="modal-box">
     <h2>メニュー</h2>
     <button id="menuBgmBtn" class="small-btn" type="button">♪ BGM オン</button>
-    <button id="menuSaveBtn" class="small-btn" type="button" hidden>動画を保存</button>
-    <button id="menuExitCleanBtn" class="small-btn" type="button">すっきり表示をやめる（ボタンを表示）</button>
     <button id="menuResetBtn" class="small-btn" type="button">最初からやり直す</button>
     <button id="menuCloseBtn" class="go-btn" type="button">閉じる</button>
   </div>
@@ -456,7 +445,7 @@
    ========================================================= */
 const $ = (id) => document.getElementById(id);
 const FONT = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",system-ui,sans-serif';
-const W = 720, H = 1280;          // 録画・描画用canvasの解像度（縦9:16）
+const W = 720, H = 1280;          // 描画用canvasの解像度（縦9:16）
 const CX = 360, CY = 640, R = 290; // ルーレットの中心と半径
 const TAU = Math.PI * 2;
 const POINTER = -Math.PI / 2;      // 矢印の位置（真上）
@@ -505,16 +494,17 @@ const state = {
   kick: 0,            // 矢印の揺れ
   resultAt: 0,
   listAt: 0,
-  recordMode: false,
   bgmOn: true,
-  clean: false,       // すっきり表示（画面収録向け）
+  canAdvance: false,  // タップで次へ進めるか
   wheel: null,
   particles: []
 };
 
 /* =========================================================
-   設定画面
+   設定（エントリー）画面
    ========================================================= */
+const chipsWrap = $('chipsWrap');
+const chipsEl = $('chips');
 const namesEl = $('names');
 
 function parseNames(text) {
@@ -522,22 +512,96 @@ function parseNames(text) {
 }
 
 // 全角・半角や連続スペースの違いも同じ名前として扱う
+function nameKey(n) {
+  return n.normalize('NFKC').replace(/\s+/g, ' ').toLowerCase();
+}
+
 function findDuplicates(names) {
   const map = new Map();
   for (const n of names) {
-    const key = n.normalize('NFKC').replace(/\s+/g, ' ').toLowerCase();
+    const key = nameKey(n);
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(n);
   }
   return [...map.values()].filter((g) => g.length > 1);
 }
 
-function maxTarget() {
-  return Math.min(MAX_TARGET, Math.max(1, state.names.length));
+// 名前を札のように並べる（animateがtrueなら1枚ずつ飛び出す演出）
+function renderChips(animate) {
+  const dupKeys = new Set(findDuplicates(state.names).map((g) => nameKey(g[0])));
+  chipsEl.innerHTML = '';
+  state.names.forEach((n, i) => {
+    const d = document.createElement('div');
+    d.className = 'chip' + (dupKeys.has(nameKey(n)) ? ' dup' : '');
+    d.textContent = n;
+    if (animate) d.style.animationDelay = Math.min(i * 35, 1200) + 'ms';
+    else d.style.animation = 'none';
+    chipsEl.appendChild(d);
+  });
+  $('emptyMsg').hidden = state.names.length > 0;
+  fitChips();
+}
+
+// 人数に応じて、札が枠に収まる一番大きな文字サイズと列数を選ぶ
+function fitChips() {
+  const n = state.names.length;
+  if (!n || !$('setup').classList.contains('active')) return;
+  const colsList = n <= 6 ? [1, 2] : n <= 12 ? [2, 3] : n <= 24 ? [3, 4] : [4, 5];
+  for (const c of chipsEl.children) c.style.fontSize = '';
+  let fsNow = 12;
+  const apply = (cols, fs) => {
+    fsNow = fs;
+    chipsEl.style.setProperty('--cols', cols);
+    chipsEl.style.setProperty('--fs', fs + 'px');
+    // 1マスに入らない長い名前は、2マス分の幅を使う
+    const kids = [...chipsEl.children];
+    kids.forEach((c) => c.classList.remove('wide'));
+    if (cols > 1) {
+      kids.filter((c) => fitRatio(c) < 1).forEach((c) => c.classList.add('wide'));
+    }
+  };
+  const done = () => shrinkLongNames(fsNow);
+  for (let fs = 26; fs >= 12; fs--) {
+    for (const cols of colsList) {
+      apply(cols, fs);
+      if (namesFit() && chipsWrap.scrollHeight <= chipsWrap.clientHeight + 1) return done();
+    }
+  }
+  // 収まりきらないときは、名前が読めることを優先して少しスクロールさせる
+  for (const cols of [...colsList].reverse()) {
+    apply(cols, 13);
+    if (namesFit()) return done();
+  }
+  apply(colsList[0], 12);
+  done();
+}
+
+// 札の中で名前に使える幅 ÷ 名前の幅（1未満なら入りきらない）。小数点以下まで正確に測る
+const measureRange = document.createRange();
+function fitRatio(c) {
+  measureRange.selectNodeContents(c);
+  const textW = measureRange.getBoundingClientRect().width;
+  const cs = getComputedStyle(c);
+  const avail = c.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  return textW > 0 ? avail / textW : 1;
+}
+
+// 長い名前は、その札だけ文字を少し小さくすれば入るか（小さくしすぎない）
+function namesFit() {
+  for (const c of chipsEl.children) {
+    if (fitRatio(c) < 0.72) return false;
+  }
+  return true;
+}
+
+function shrinkLongNames(fs) {
+  for (const c of chipsEl.children) {
+    const r = fitRatio(c);
+    if (r < 1) c.style.fontSize = Math.max(9, Math.floor(fs * r * 0.97 * 10) / 10) + 'px';
+  }
 }
 
 function updateSetup() {
-  state.names = parseNames(namesEl.value);
   const n = state.names.length;
   $('count').textContent = n;
 
@@ -545,60 +609,103 @@ function updateSetup() {
   const dupEl = $('dupWarn');
   if (dups.length) {
     dupEl.hidden = false;
-    dupEl.innerHTML = '';
-    const head = document.createElement('div');
-    head.textContent = '⚠ 同じ名前が重複しています。修正してください。';
-    const ul = document.createElement('ul');
-    for (const g of dups) {
-      const li = document.createElement('li');
-      li.textContent = '「' + g[0] + '」が ' + g.length + '件';
-      ul.appendChild(li);
-    }
-    dupEl.append(head, ul);
+    dupEl.textContent = '⚠ 同じ名前があります：' + dups.map((g) => '「' + g[0] + '」').join('') + '（赤い札）。「編集」で直してください。';
   } else {
     dupEl.hidden = true;
   }
 
-  state.target = Math.min(state.wanted, maxTarget());
+  // 名前を入れる前は1〜10名で選べ、入れた後は参加者数までに抑える
+  const upper = n ? Math.min(MAX_TARGET, n) : MAX_TARGET;
+  state.target = Math.min(state.wanted, upper);
   $('target').textContent = state.target;
   $('minusBtn').disabled = state.target <= 1;
-  $('plusBtn').disabled = state.target >= Math.min(MAX_TARGET, n);
+  $('plusBtn').disabled = state.target >= upper;
   const note = $('targetNote');
-  if (n > 0 && state.wanted > n) {
-    note.hidden = false;
-    note.textContent = '参加者が' + n + '名のため、当選人数を' + n + '名にしています。';
-  } else {
-    note.hidden = true;
-  }
+  note.hidden = !(n > 0 && state.wanted > n);
+  note.textContent = '参加者数に合わせています';
+
+  $('pasteBtn').textContent = n ? '📋 貼り直す' : '📋 名前を貼り付け';
 
   let reason = '';
-  if (n === 0) reason = '参加者の名前を入力してください';
-  else if (dups.length) reason = '重複している名前を修正してください';
+  if (n === 0) reason = '参加者の名前を貼り付けてください';
+  else if (dups.length) reason = '重複している名前を直してください';
   $('goBtn').disabled = reason !== '';
   $('goReason').textContent = reason;
+  $('goReason').hidden = reason === '';
 }
 
-namesEl.addEventListener('input', updateSetup);
-$('clearBtn').addEventListener('click', () => {
-  if (namesEl.value === '' || confirm('入力した名前をすべて消しますか？')) {
-    namesEl.value = '';
-    updateSetup();
+function setNames(text, animate) {
+  state.names = parseNames(text);
+  updateSetup();
+  renderChips(animate);
+}
+
+let toastTimer = 0;
+function showToast(text, isError, ms) {
+  const el = $('toast');
+  el.textContent = text;
+  el.classList.toggle('error', !!isError);
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, ms || 4000);
+}
+
+// クリップボードから名前を読み込む（iPhoneでは「ペースト」の確認が出る）
+$('pasteBtn').addEventListener('click', async () => {
+  let text = null;
+  try {
+    if (navigator.clipboard && navigator.clipboard.readText) text = await navigator.clipboard.readText();
+  } catch (e) {
+    text = null;
   }
+  if (text === null) {
+    openEditor('ここに名前を貼り付けて「決定」を押してください（入力欄を長押し →「ペースト」）。');
+    return;
+  }
+  if (parseNames(text).length === 0) {
+    showToast('コピーした内容に名前が見つかりませんでした。メモで名前をコピーしてから押してください。', true);
+    return;
+  }
+  setNames(text, true);
 });
+
+function openEditor(hint) {
+  $('editHint').textContent = hint || '1行に1名ずつ入力します。空行や前後のスペースは自動で無視します。';
+  namesEl.value = state.names.join('\n');
+  $('editModal').hidden = false;
+  namesEl.focus();
+}
+function closeEditor() {
+  namesEl.blur();
+  $('editModal').hidden = true;
+}
+$('editBtn').addEventListener('click', () => openEditor());
+$('editCancelBtn').addEventListener('click', closeEditor);
+$('editClearBtn').addEventListener('click', () => { namesEl.value = ''; namesEl.focus(); });
+$('editDoneBtn').addEventListener('click', () => {
+  closeEditor();
+  setNames(namesEl.value, true);
+});
+
 $('minusBtn').addEventListener('click', () => {
   state.wanted = Math.max(1, state.target - 1);
   updateSetup();
 });
 $('plusBtn').addEventListener('click', () => {
-  state.wanted = Math.min(MAX_TARGET, state.names.length, state.target + 1);
+  state.wanted = Math.min(MAX_TARGET, state.names.length || MAX_TARGET, state.target + 1);
   updateSetup();
 });
+$('bgmToggle').addEventListener('change', (e) => {
+  state.bgmOn = e.target.checked;
+  updateBgmLabel();
+});
+window.addEventListener('resize', fitChips);
 
 /* =========================================================
    効果音（Web Audio APIで合成）
    ========================================================= */
 const Sound = {
-  ctx: null, master: null, out: null, recDest: null, noise: null,
+  ctx: null, master: null, out: null, noise: null,
 
   // iPhoneはボタン操作の中でAudioContextを作成・再開しないと音が出ないため、各ボタンで呼ぶ
   ensure() {
@@ -628,17 +735,6 @@ const Sound = {
   },
 
   ready() { return this.ctx && this.ctx.state === 'running'; },
-
-  // 録画用の音声ストリーム（スピーカーと同じ音を流す）
-  getRecordTrack() {
-    if (!this.ctx || !this.ctx.createMediaStreamDestination) return null;
-    if (!this.recDest) {
-      this.recDest = this.ctx.createMediaStreamDestination();
-      this.out.connect(this.recDest);
-    }
-    const t = this.recDest.stream.getAudioTracks()[0];
-    return t ? t.clone() : null;
-  },
 
   tick() {
     if (!this.ready()) return;
@@ -967,230 +1063,9 @@ function syncBgm() {
   }
 }
 
-function updateBgmButton() {
-  const b = $('bgmBtn');
-  b.textContent = state.bgmOn ? '♪ BGM オン' : '♪ BGM オフ';
-  b.setAttribute('aria-pressed', String(state.bgmOn));
-  $('menuBgmBtn').textContent = b.textContent;
+function updateBgmLabel() {
+  $('menuBgmBtn').textContent = state.bgmOn ? '♪ BGM オン（タップでオフ）' : '♪ BGM オフ（タップでオン）';
 }
-
-/* =========================================================
-   診断ログ（録画の不具合の原因を調べるため）
-   ========================================================= */
-const Diag = {
-  t0: 0, lines: [],
-  start() {
-    this.t0 = performance.now();
-    this.lines = [navigator.userAgent];
-  },
-  log(msg) {
-    if (!this.t0) return;
-    const sec = ((performance.now() - this.t0) / 1000).toFixed(1);
-    const where = state.phase + (state.phase === 'list' ? '' : ' ' + (state.winners.length + (state.phase === 'result' ? 0 : 1)) + '人目');
-    this.lines.push(sec + '秒 [' + where + '] ' + msg);
-    if (this.lines.length > 300) this.lines.splice(1, 1);
-  },
-  text() { return this.lines.join('\n'); }
-};
-
-/* =========================================================
-   録画（canvas.captureStream + MediaRecorder）
-   ========================================================= */
-const Rec = {
-  support: null, recorder: null, chunks: [], blob: null, url: null, file: null,
-  // Safariでは録画中にストリームが回収されると映像だけ止まるため、終了まで参照を保持する
-  stream: null, videoTrack: null, audioTrack: null,
-  watch: null, stallWarned: false, frames: 0, lastFrameAt: 0,
-  filename: '', active: false, discarded: false, interrupted: false,
-
-  detect() {
-    if (typeof MediaRecorder === 'undefined') {
-      return { ok: false, reason: 'このブラウザは動画の録画（MediaRecorder）に対応していません。' };
-    }
-    if (!HTMLCanvasElement.prototype.captureStream) {
-      return { ok: false, reason: 'このブラウザは画面の映像を取り出す機能（captureStream）に対応していません。' };
-    }
-    const types = [
-      'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
-      'video/mp4;codecs=avc1,mp4a',
-      'video/mp4',
-      'video/webm;codecs="vp9,opus"',
-      'video/webm;codecs="vp8,opus"',
-      'video/webm'
-    ];
-    if (typeof MediaRecorder.isTypeSupported === 'function') {
-      for (const t of types) {
-        if (MediaRecorder.isTypeSupported(t)) return { ok: true, mime: t, mp4: t.startsWith('video/mp4') };
-      }
-      return { ok: false, reason: '対応している動画形式が見つかりませんでした。' };
-    }
-    return { ok: true, mime: '', mp4: false };
-  },
-
-  start(canvas) {
-    this.reset();
-    try {
-      const stream = canvas.captureStream(30);
-      const audio = Sound.getRecordTrack();
-      if (audio) stream.addTrack(audio);
-      this.stream = stream;
-      this.videoTrack = stream.getVideoTracks()[0] || null;
-      this.audioTrack = audio;
-      const opts = { videoBitsPerSecond: 2500000, audioBitsPerSecond: 128000 };
-      if (this.support.mime) opts.mimeType = this.support.mime;
-      let r;
-      try { r = new MediaRecorder(stream, opts); } catch (e) { r = new MediaRecorder(stream); }
-      r.ondataavailable = (e) => { if (e.data && e.data.size > 0) this.chunks.push(e.data); };
-      r.onstop = () => this.finish();
-      r.onerror = (e) => {
-        Diag.log('MediaRecorderエラー: ' + ((e && e.error && e.error.name) || '不明'));
-        warnRecording('録画中にエラーが発生しました。iPhoneの「画面収録」をご利用ください。');
-      };
-      r.start();
-      this.recorder = r;
-      this.active = true;
-      Diag.start();
-      Diag.log('録画開始 mimeType=' + (r.mimeType || this.support.mime || '(既定)'));
-      this.startWatch();
-      return true;
-    } catch (e) {
-      this.releaseStream();
-      this.recorder = null;
-      this.active = false;
-      return false;
-    }
-  },
-
-  stop() {
-    if (this.recorder && this.recorder.state !== 'inactive') this.recorder.stop();
-  },
-
-  // 録画している映像が実際に流れているかを監視する
-  startWatch() {
-    const vt = this.videoTrack;
-    if (!vt) return;
-    vt.addEventListener('ended', () => {
-      Diag.log('映像トラックが終了（ended）');
-      if (this.active) warnRecording('録画の映像が止まりました。動画は途中から静止画になります。iPhoneの「画面収録」をご利用ください。');
-    });
-    vt.addEventListener('mute', () => Diag.log('映像トラックmute'));
-    vt.addEventListener('unmute', () => Diag.log('映像トラックunmute'));
-    this.frames = 0;
-    this.lastFrameAt = performance.now();
-    this.stallWarned = false;
-    const v = document.createElement('video');
-    if (!('requestVideoFrameCallback' in v)) {
-      Diag.log('フレーム監視は非対応');
-      return;
-    }
-    v.muted = true;
-    v.playsInline = true;
-    v.setAttribute('playsinline', '');
-    v.style.cssText = 'position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:0.01;pointer-events:none;';
-    v.srcObject = new MediaStream([vt]);
-    document.body.appendChild(v);
-    const onFrame = () => {
-      if (!this.watch) return;
-      this.frames++;
-      const now = performance.now();
-      if (this.stallWarned) {
-        Diag.log('映像フレームが再開');
-        this.stallWarned = false;
-      }
-      this.lastFrameAt = now;
-      v.requestVideoFrameCallback(onFrame);
-    };
-    v.requestVideoFrameCallback(onFrame);
-    v.play().catch((e) => Diag.log('監視用video再生失敗: ' + e.name));
-    const timer = setInterval(() => {
-      if (!this.active || document.visibilityState !== 'visible') return;
-      const gap = performance.now() - this.lastFrameAt;
-      if (this.frames > 0 && gap > 2000 && !this.stallWarned) {
-        this.stallWarned = true;
-        Diag.log('映像フレームが' + (gap / 1000).toFixed(1) + '秒届いていない（ここまで' + this.frames + 'フレーム）track=' + vt.readyState + (vt.muted ? ',muted' : ''));
-        warnRecording('録画の映像が止まった可能性があります。iPhoneの「画面収録」もあわせてご利用ください。');
-      }
-    }, 500);
-    this.watch = { video: v, timer: timer };
-  },
-
-  stopWatch() {
-    if (!this.watch) return;
-    clearInterval(this.watch.timer);
-    const v = this.watch.video;
-    this.watch = null;
-    v.pause();
-    v.srcObject = null;
-    v.remove();
-    Diag.log('監視終了（受信フレーム数 ' + this.frames + '）');
-  },
-
-  releaseStream() {
-    this.stopWatch();
-    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
-    this.stream = null; this.videoTrack = null; this.audioTrack = null;
-  },
-
-  finish() {
-    Diag.log('録画停止');
-    this.releaseStream();
-    this.active = false;
-    if (this.discarded) { this.chunks = []; return; }
-    const mime = ((this.recorder && this.recorder.mimeType) || this.support.mime || 'video/mp4').split(';')[0];
-    const ext = mime.indexOf('webm') >= 0 ? 'webm' : 'mp4';
-    this.blob = new Blob(this.chunks, { type: mime });
-    this.chunks = [];
-    if (this.blob.size === 0) {
-      this.blob = null;
-      showCtrlMsg('動画を作成できませんでした。iPhoneの「画面収録」をご利用ください。', true);
-      return;
-    }
-    const d = new Date();
-    const p = (v) => String(v).padStart(2, '0');
-    this.filename = 'harbor-roulette-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + '.' + ext;
-    this.url = URL.createObjectURL(this.blob);
-    try { this.file = new File([this.blob], this.filename, { type: mime }); } catch (e) { this.file = null; }
-    onRecordingReady();
-  },
-
-  reset() {
-    if (this.url) URL.revokeObjectURL(this.url);
-    this.recorder = null; this.chunks = []; this.blob = null; this.url = null; this.file = null;
-    this.discarded = false; this.interrupted = false; this.active = false;
-  },
-
-  discard() {
-    this.discarded = true;
-    if (this.recorder && this.recorder.state !== 'inactive') {
-      try { this.recorder.stop(); } catch (e) { /* 無視 */ }
-    }
-    if (this.url) URL.revokeObjectURL(this.url);
-    this.blob = null; this.url = null; this.file = null; this.active = false;
-  }
-};
-
-function setupRecordUI() {
-  Rec.support = Rec.detect();
-  const st = $('recStatus');
-  const toggle = $('recToggle');
-  if (!Rec.support.ok) {
-    toggle.checked = false;
-    toggle.disabled = true;
-    st.className = 'warn';
-    st.textContent = Rec.support.reason + ' 録画したい場合は、iPhoneの「画面収録」をご利用ください（手順は下にあります）。';
-    $('screenRecHelp').open = true;
-  } else if (Rec.support.mp4) {
-    st.className = 'info';
-    st.textContent = 'この端末では録画モードを使えます（mp4形式）。';
-  } else {
-    st.className = 'info';
-    st.textContent = 'この端末では録画モードを使えますが、形式はWebMになります（iPhoneの写真アプリでは再生できない場合があります）。';
-  }
-}
-$('recToggle').addEventListener('change', (e) => {
-  Sound.ensure();
-  state.recordMode = e.target.checked;
-});
 
 /* =========================================================
    描画
@@ -1539,7 +1414,7 @@ function drawStatus(now) {
   ctx.textBaseline = 'middle';
   let main = '', sub = '';
   if (state.phase === 'ready') {
-    main = state.clean ? '画面をタップしてスタート！' : 'スタートで抽選開始！';
+    main = '画面をタップしてスタート！';
     sub = '残り ' + state.candidates.length + '名 から抽選';
   } else if (state.phase === 'spinning' || state.phase === 'stopping') {
     main = '抽選中' + '.'.repeat(1 + Math.floor(now / 300) % 3);
@@ -1683,7 +1558,7 @@ function drawResult(now) {
   ctx.fillText('ハーバー獲得おめでとう！', 0, 210);
   ctx.restore();
 
-  if (state.clean && t > 1.4 && Math.floor(now / 600) % 2 === 0) {
+  if (t > 1.4 && Math.floor(now / 600) % 2 === 0) {
     ctx.font = font(34, 800);
     ctx.fillStyle = COL.gold2;
     ctx.fillText(state.winners.length < state.target ? 'タップで次の抽選へ ▶' : 'タップで当選者一覧へ ▶', CX, 1010);
@@ -1765,7 +1640,7 @@ function boundaryCount(rot, a) {
 }
 
 function startSpin() {
-  if (state.phase !== 'ready') return; // 録画開始待ちの間にリセットされた場合
+  if (state.phase !== 'ready') return;
   const n = state.candidates.length;
   const a = TAU / n;
   const winner = randomInt(n);             // 当選者をここで決める
@@ -1786,7 +1661,6 @@ function startSpin() {
   state.phase = 'spinning';
   syncBgm();
   Sound.drumrollStart(state.spin.duration / 1000);
-  updateControls();
 }
 
 // 停止角度から矢印の下の区画を求める（表示と結果が必ず一致する）
@@ -1809,7 +1683,7 @@ function onSpinEnd() {
     state.phase = 'result';
     spawnParticles(70);
     Sound.fanfare();
-    updateControls();
+    armAdvance(1200); // 連打で進みすぎないよう少し待つ
     // ファンファーレが終わってからBGMを再開する
     bgmResumeTimer = setTimeout(() => { if (state.phase === 'result' || state.phase === 'list') syncBgm(); }, 2600);
   }, 450);
@@ -1837,83 +1711,44 @@ function update(now, dt) {
 }
 
 let rafId = 0, lastFrame = 0;
-let lastPhase = '';
 function loop(now) {
-  const raw = lastFrame ? (now - lastFrame) / 1000 : 0;
-  const dt = Math.min(0.1, raw);
+  const dt = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
   lastFrame = now;
-  if (Rec.active) {
-    if (raw > 0.5) Diag.log('描画が' + raw.toFixed(1) + '秒止まっていた');
-    if (state.phase !== lastPhase) Diag.log('場面切替');
-  }
-  lastPhase = state.phase;
   update(now, dt);
   render(now);
   rafId = requestAnimationFrame(loop);
 }
 
 /* =========================================================
-   抽選画面の操作
+   抽選画面の操作（ルーレットをタップして進める）
    ========================================================= */
-const mainBtn = $('mainBtn');
-let resultBtnTimer = 0;
-let recStopTimer = 0;
-
-function showCtrlMsg(text, isError) {
-  const el = $('ctrlMsg');
-  el.textContent = text;
-  el.classList.toggle('error', !!isError);
-  if (state.clean && text && isError) showToast(text, true);
+let advanceTimer = 0;
+function armAdvance(ms) {
+  state.canAdvance = false;
+  clearTimeout(advanceTimer);
+  advanceTimer = setTimeout(() => { state.canAdvance = true; }, ms);
 }
 
-let toastTimer = 0;
-function showToast(text, isError, ms) {
-  const el = $('toast');
-  el.textContent = text;
-  el.classList.toggle('error', !!isError);
-  el.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, ms || 5000);
-}
-
-function warnRecording(text) {
-  showCtrlMsg(text, true);
-  if (!state.clean) showToast(text, true, 6000);
-}
-
-function showRecIndicator() {
-  const el = $('ctrlMsg');
-  el.classList.remove('error');
-  el.innerHTML = '<span class="rec-dot"></span>録画中（アプリを切り替えないでください）';
-}
-
-function updateControls() {
-  mainBtn.hidden = false;
-  clearTimeout(resultBtnTimer);
-  switch (state.phase) {
-    case 'ready':
-      mainBtn.textContent = 'スタート';
-      mainBtn.disabled = false;
-      break;
-    case 'spinning':
-    case 'stopping':
-      mainBtn.textContent = '抽選中…';
-      mainBtn.disabled = true;
-      break;
-    case 'result':
-      mainBtn.textContent = state.winners.length < state.target
-        ? '次の抽選へ（' + (state.winners.length + 1) + '人目）'
-        : '当選者一覧を見る';
-      // 連打で進みすぎないよう少し待ってから押せるようにする
-      mainBtn.disabled = true;
-      resultBtnTimer = setTimeout(() => { mainBtn.disabled = false; }, 1200);
-      break;
-    case 'list':
-      mainBtn.hidden = true;
-      break;
+function advance() {
+  if (!state.canAdvance) return;
+  Sound.ensure();
+  if (state.phase === 'ready') {
+    state.canAdvance = false;
+    startSpin();
+  } else if (state.phase === 'result') {
+    if (state.winners.length < state.target) {
+      state.wheel = buildWheel(state.candidates);
+      state.particles = [];
+      state.phase = 'ready';
+      armAdvance(400);
+    } else {
+      state.phase = 'list';
+      state.listAt = performance.now();
+      state.canAdvance = false;
+      spawnParticles(50);
+    }
+    syncBgm();
   }
-  $('saveBtn').hidden = !(state.phase === 'list' && Rec.blob);
-  $('menuSaveBtn').hidden = !Rec.blob;
 }
 
 function fitStage() {
@@ -1926,7 +1761,7 @@ function fitStage() {
   canvas.style.height = Math.floor(h) + 'px';
 }
 window.addEventListener('resize', fitStage);
-window.addEventListener('orientationchange', () => setTimeout(fitStage, 300));
+window.addEventListener('orientationchange', () => setTimeout(() => { fitStage(); fitChips(); }, 300));
 
 let wakeLock = null;
 async function requestWakeLock() {
@@ -1941,152 +1776,32 @@ function releaseWakeLock() {
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') {
-    if (Rec.active) Rec.interrupted = true;
-  } else if (state.phase !== 'setup') {
-    requestWakeLock();
-    if (Rec.interrupted && Rec.active) {
-      showCtrlMsg('録画中に画面を離れたため、動画が正しく保存されない可能性があります。', true);
-    }
-  }
+  if (document.visibilityState === 'visible' && state.phase !== 'setup') requestWakeLock();
 });
 
 $('goBtn').addEventListener('click', () => {
-  updateSetup();
   if ($('goBtn').disabled) return;
   Sound.ensure();
   requestWakeLock();
-  state.recordMode = $('recToggle').checked && Rec.support.ok;
   state.bgmOn = $('bgmToggle').checked;
-  updateBgmButton();
-  setClean($('cleanToggle').checked);
-  if (state.clean) showToast('ルーレットをタップしてスタート／長押しでメニュー', false, 4000);
+  updateBgmLabel();
   state.candidates = state.names.slice();
   state.winners = [];
   state.rot = randomFloat() * TAU;
   state.wheel = buildWheel(state.candidates);
   state.phase = 'ready';
   state.particles = [];
-  Rec.reset();
   $('setup').classList.remove('active');
   $('lottery').classList.add('active');
-  document.body.classList.add('lock');
-  window.scrollTo(0, 0);
-  if (state.recordMode) showCtrlMsg('録画モード：スタートを押すと録画が始まります');
-  else showCtrlMsg('');
-  updateControls();
+  armAdvance(400);
   requestAnimationFrame(() => { fitStage(); setTimeout(fitStage, 300); });
   if (!rafId) { lastFrame = 0; rafId = requestAnimationFrame(loop); }
   syncBgm();
 });
 
-function toggleBgm() {
-  Sound.ensure();
-  state.bgmOn = !state.bgmOn;
-  $('bgmToggle').checked = state.bgmOn;
-  updateBgmButton();
-  syncBgm();
-}
-$('bgmBtn').addEventListener('click', toggleBgm);
-
-function mainAction() {
-  Sound.ensure();
-  if (state.phase === 'ready') {
-    let delay = 0;
-    if (state.recordMode && !Rec.recorder && !Rec.blob) {
-      if (Rec.start(canvas)) {
-        showRecIndicator();
-        delay = 400; // 録画の開始を待ってから回す
-      } else {
-        state.recordMode = false;
-        showCtrlMsg('録画を開始できませんでした。iPhoneの「画面収録」をご利用ください。', true);
-      }
-    }
-    mainBtn.disabled = true;
-    setTimeout(startSpin, delay);
-  } else if (state.phase === 'result') {
-    if (state.winners.length < state.target) {
-      state.wheel = buildWheel(state.candidates);
-      state.particles = [];
-      state.phase = 'ready';
-    } else {
-      state.phase = 'list';
-      state.listAt = performance.now();
-      spawnParticles(50);
-      if (Rec.active) {
-        showCtrlMsg('録画を仕上げています…（あと数秒）');
-        // 一覧が全員表示されてから少し余韻を残して録画を止める
-        const wait = 1500 + state.winners.length * 250 + 3500;
-        recStopTimer = setTimeout(() => Rec.stop(), wait);
-      }
-    }
-    updateControls();
-    syncBgm();
-  }
-}
-mainBtn.addEventListener('click', mainAction);
-
-function onRecordingReady() {
-  if (Rec.interrupted) {
-    showCtrlMsg('録画が完了しました（途中で画面を離れたため、映像が乱れている可能性があります）');
-  } else {
-    showCtrlMsg('録画が完了しました。「動画を保存」から保存できます。');
-  }
-  updateControls();
-  openVideoModal();
-}
-
-function resetAll() {
-  const msg = Rec.active
-    ? '録画を中止して、最初からやり直しますか？\n（抽選結果と録画は消えます。入力した名前は残ります）'
-    : '最初からやり直しますか？\n（抽選結果' + (Rec.blob ? 'と録画した動画' : '') + 'は消えます。入力した名前は残ります）';
-  if (!confirm(msg)) return;
-  clearTimeout(recStopTimer);
-  clearTimeout(resultBtnTimer);
-  Rec.discard();
-  closeVideoModal();
-  cancelAnimationFrame(rafId);
-  rafId = 0;
-  state.phase = 'setup';
-  state.spin = null;
-  Sound.drumrollStop();
-  syncBgm();
-  state.winners = [];
-  state.candidates = [];
-  state.particles = [];
-  releaseWakeLock();
-  $('lottery').classList.remove('active');
-  $('setup').classList.add('active');
-  document.body.classList.remove('lock');
-  showCtrlMsg('');
-  updateSetup();
-  window.scrollTo(0, 0);
-  setClean(false);
-  closeMenu();
-}
-$('resetBtn').addEventListener('click', resetAll);
-
-/* =========================================================
-   すっきり表示（画面収録向け）
-   ========================================================= */
-function setClean(on) {
-  state.clean = on;
-  document.body.classList.toggle('clean', on);
-  if (state.phase !== 'setup') requestAnimationFrame(fitStage);
-}
-
-function openMenu() {
-  updateControls();
-  $('menuModal').hidden = false;
-}
-function closeMenu() {
-  $('menuModal').hidden = true;
-}
-
 // 短くタップ：スタート／次へ　長押し：メニュー
 let pressTimer = 0, pressStart = null;
 canvas.addEventListener('pointerdown', (e) => {
-  if (!state.clean) return;
   pressStart = { x: e.clientX, y: e.clientY };
   clearTimeout(pressTimer);
   pressTimer = setTimeout(() => { pressStart = null; openMenu(); }, 700);
@@ -2098,82 +1813,60 @@ canvas.addEventListener('pointermove', (e) => {
   }
 });
 canvas.addEventListener('pointerup', () => {
-  if (!state.clean) return;
   clearTimeout(pressTimer);
-  if (pressStart) {
-    if (state.phase === 'list') openMenu();
-    else if (!mainBtn.disabled && !mainBtn.hidden) mainAction();
-  }
+  if (pressStart) advance();
   pressStart = null;
 });
 canvas.addEventListener('pointercancel', () => { clearTimeout(pressTimer); pressStart = null; });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+/* ---------- メニュー ---------- */
+function openMenu() { $('menuModal').hidden = false; }
+function closeMenu() { $('menuModal').hidden = true; }
+
+function toggleBgm() {
+  Sound.ensure();
+  state.bgmOn = !state.bgmOn;
+  $('bgmToggle').checked = state.bgmOn;
+  updateBgmLabel();
+  syncBgm();
+}
+
+function resetAll() {
+  if (!confirm('最初からやり直しますか？\n（抽選結果は消えます。入力した名前は残ります）')) return;
+  clearTimeout(advanceTimer);
+  cancelAnimationFrame(rafId);
+  rafId = 0;
+  state.phase = 'setup';
+  state.spin = null;
+  state.canAdvance = false;
+  Sound.drumrollStop();
+  syncBgm();
+  state.winners = [];
+  state.candidates = [];
+  state.particles = [];
+  releaseWakeLock();
+  closeMenu();
+  $('lottery').classList.remove('active');
+  $('setup').classList.add('active');
+  updateSetup();
+  renderChips(false);
+}
+
+$('menuBtn').addEventListener('click', openMenu);
 $('menuBgmBtn').addEventListener('click', toggleBgm);
-$('menuSaveBtn').addEventListener('click', () => { closeMenu(); openVideoModal(); });
-$('menuExitCleanBtn').addEventListener('click', () => { setClean(false); closeMenu(); });
-$('menuResetBtn').addEventListener('click', () => { closeMenu(); resetAll(); });
+$('menuResetBtn').addEventListener('click', resetAll);
 $('menuCloseBtn').addEventListener('click', closeMenu);
-
-/* =========================================================
-   動画の保存
-   ========================================================= */
-function openVideoModal() {
-  if (!Rec.blob) return;
-  $('preview').src = Rec.url;
-  $('modalMsg').textContent = '';
-  const canShare = !!(Rec.file && navigator.canShare && navigator.canShare({ files: [Rec.file] }));
-  $('shareBtn').hidden = !canShare;
-  $('diagText').textContent = Diag.text();
-  $('videoModal').hidden = false;
-}
-function closeVideoModal() {
-  const v = $('preview');
-  v.pause();
-  v.removeAttribute('src');
-  v.load();
-  $('videoModal').hidden = true;
-}
-function downloadVideo() {
-  if (!Rec.url) return;
-  const a = document.createElement('a');
-  a.href = Rec.url;
-  a.download = Rec.filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-
-$('saveBtn').addEventListener('click', openVideoModal);
-$('closeModalBtn').addEventListener('click', closeVideoModal);
-$('copyDiagBtn').addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText(Diag.text());
-    $('copyDiagBtn').textContent = 'コピーしました';
-  } catch (e) {
-    $('copyDiagBtn').textContent = 'コピーできませんでした（長押しで選択してください）';
-  }
-  setTimeout(() => { $('copyDiagBtn').textContent = '診断情報をコピー'; }, 2500);
-});
-$('downloadBtn').addEventListener('click', downloadVideo);
-$('shareBtn').addEventListener('click', async () => {
-  if (!Rec.file) { downloadVideo(); return; }
-  try {
-    await navigator.share({ files: [Rec.file] });
-  } catch (e) {
-    if (e && e.name !== 'AbortError') {
-      $('modalMsg').textContent = '共有できませんでした。「ファイルとしてダウンロード」をお試しください。';
-    }
-  }
-});
 
 /* =========================================================
    初期化
    ========================================================= */
 bgCanvas = buildBackground();
 wheelBaseCanvas = buildWheelBase();
-setupRecordUI();
+// 設定画面の背景にも、ルーレット画面と同じ港の夜景を使う
+$('setup').style.backgroundImage = 'url(' + bgCanvas.toDataURL('image/png') + ')';
 updateSetup();
+updateBgmLabel();
 </script>
 </body>
 </html>
