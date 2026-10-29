@@ -381,7 +381,7 @@
         <span class="name">当選人数<span id="targetNote" class="note" hidden></span></span>
         <div class="stepper">
           <button id="minusBtn" type="button" aria-label="当選人数を減らす">−</button>
-          <div class="value"><b id="target">5</b>名</div>
+          <div class="value"><b id="target">7</b>名</div>
           <button id="plusBtn" type="button" aria-label="当選人数を増やす">＋</button>
         </div>
       </div>
@@ -479,8 +479,8 @@ function randomFloat() {
    ========================================================= */
 const state = {
   names: [],
-  wanted: 5,          // ユーザーが選んだ当選人数
-  target: 5,          // 実際の当選人数（参加者数で上限をかけた値）
+  wanted: 7,          // ユーザーが選んだ当選人数
+  target: 7,          // 実際の当選人数（参加者数で上限をかけた値）
   candidates: [],     // まだ当選していない人
   winners: [],
   phase: 'setup',     // setup | ready | spinning | stopping | result | list
