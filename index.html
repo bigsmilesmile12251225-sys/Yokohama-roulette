@@ -110,11 +110,10 @@
     font-weight: 800;
     text-align: center;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     line-height: 1.25;
     animation: pop .35s ease-out both;
   }
+  .chip.wrap { white-space: normal; overflow-wrap: anywhere; }
   .chip.dup { background: #ffe1e5; border-color: var(--red); color: var(--red-dark); }
   .chip.wide { grid-column: span 2; }
   @keyframes pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
@@ -542,64 +541,87 @@ function renderChips(animate) {
   fitChips();
 }
 
-// 人数に応じて、札が枠に収まる一番大きな文字サイズと列数を選ぶ
+// 人数に応じて、札の文字サイズと列数を選ぶ（名前は必ずフルネームで表示する）
+const MIN_CHIP_FS = 16;
 function fitChips() {
   const n = state.names.length;
   if (!n || !$('setup').classList.contains('active')) return;
-  const colsList = n <= 6 ? [1, 2] : n <= 12 ? [2, 3] : n <= 24 ? [3, 4] : [4, 5];
-  for (const c of chipsEl.children) c.style.fontSize = '';
-  let fsNow = 12;
+  const kids = [...chipsEl.children];
+  const colsList = n <= 6 ? [1, 2] : [2, 3];
   const apply = (cols, fs) => {
-    fsNow = fs;
     chipsEl.style.setProperty('--cols', cols);
     chipsEl.style.setProperty('--fs', fs + 'px');
+    kids.forEach((c) => c.classList.remove('wide', 'wrap'));
     // 1マスに入らない長い名前は、2マス分の幅を使う
-    const kids = [...chipsEl.children];
-    kids.forEach((c) => c.classList.remove('wide'));
-    if (cols > 1) {
-      kids.filter((c) => fitRatio(c) < 1).forEach((c) => c.classList.add('wide'));
-    }
+    if (cols > 1) kids.filter((c) => !nameFits(c)).forEach((c) => c.classList.add('wide'));
   };
-  const done = () => shrinkLongNames(fsNow);
-  for (let fs = 26; fs >= 12; fs--) {
+  const allFit = () => kids.every(nameFits);
+  const noScroll = () => chipsWrap.scrollHeight <= chipsWrap.clientHeight + 1;
+  // 1) スクロールなしで全員が1行に収まる、いちばん大きな文字
+  for (let fs = 26; fs >= MIN_CHIP_FS; fs--) {
     for (const cols of colsList) {
       apply(cols, fs);
-      if (namesFit() && chipsWrap.scrollHeight <= chipsWrap.clientHeight + 1) return done();
+      if (allFit() && noScroll()) return;
     }
   }
-  // 収まりきらないときは、名前が読めることを優先して少しスクロールさせる
+  // 2) 収まらなければ、読みやすい大きさのままスクロールする（列はなるべく多く）
   for (const cols of [...colsList].reverse()) {
-    apply(cols, 13);
-    if (namesFit()) return done();
+    apply(cols, MIN_CHIP_FS);
+    if (allFit()) return;
   }
-  apply(colsList[0], 12);
-  done();
+  // 3) それでも1行に入らない名前は、札の中で折り返す
+  apply(colsList[0], MIN_CHIP_FS);
+  kids.filter((c) => !nameFits(c)).forEach((c) => c.classList.add('wrap'));
 }
 
-// 札の中で名前に使える幅 ÷ 名前の幅（1未満なら入りきらない）。小数点以下まで正確に測る
+// 名前が札の中に1行で入るか（小数点以下まで正確に測る）
+// 札が飛び出すアニメーション中は縮小されているので、その倍率で割り戻して実寸にする
 const measureRange = document.createRange();
-function fitRatio(c) {
+function nameFits(c) {
   measureRange.selectNodeContents(c);
-  const textW = measureRange.getBoundingClientRect().width;
+  const scale = c.offsetWidth ? c.getBoundingClientRect().width / c.offsetWidth : 1;
+  const textW = measureRange.getBoundingClientRect().width / (scale || 1);
   const cs = getComputedStyle(c);
   const avail = c.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  return textW > 0 ? avail / textW : 1;
+  return avail >= textW + 1;
 }
 
-// 長い名前は、その札だけ文字を少し小さくすれば入るか（小さくしすぎない）
-function namesFit() {
-  for (const c of chipsEl.children) {
-    if (fitRatio(c) < 0.72) return false;
-  }
-  return true;
+// 貼り付け後、枠の中をゆっくり下までスクロールして全員を見せ、最後に上へ戻す
+let autoScroll = null;
+function stopAutoScroll() {
+  if (!autoScroll) return;
+  clearTimeout(autoScroll.timer);
+  cancelAnimationFrame(autoScroll.raf);
+  autoScroll = null;
 }
-
-function shrinkLongNames(fs) {
-  for (const c of chipsEl.children) {
-    const r = fitRatio(c);
-    if (r < 1) c.style.fontSize = Math.max(9, Math.floor(fs * r * 0.97 * 10) / 10) + 'px';
-  }
+function startAutoScroll(delay) {
+  stopAutoScroll();
+  chipsWrap.scrollTop = 0;
+  const job = { timer: 0, raf: 0 };
+  autoScroll = job;
+  const SPEED = 20;       // 下へ進む速さ（px/秒）
+  const HOLD = 2500;      // 一番下で止まる時間（ミリ秒）
+  const BACK = 2000;      // 上へ戻る時間（ミリ秒）
+  const ease = (k) => 0.5 - 0.5 * Math.cos(Math.PI * k);
+  job.timer = setTimeout(() => {
+    const max = chipsWrap.scrollHeight - chipsWrap.clientHeight;
+    if (max <= 2) { autoScroll = null; return; }
+    const down = Math.max(3000, max / SPEED * 1000);
+    const t0 = performance.now();
+    const step = (now) => {
+      if (autoScroll !== job) return;
+      const t = now - t0;
+      if (t < down) chipsWrap.scrollTop = max * ease(t / down);
+      else if (t < down + HOLD) chipsWrap.scrollTop = max;
+      else if (t < down + HOLD + BACK) chipsWrap.scrollTop = max * (1 - ease((t - down - HOLD) / BACK));
+      else { chipsWrap.scrollTop = 0; autoScroll = null; return; }
+      job.raf = requestAnimationFrame(step);
+    };
+    job.raf = requestAnimationFrame(step);
+  }, delay);
 }
+// 指で触ったら自動スクロールはやめる
+['pointerdown', 'touchstart', 'wheel'].forEach((ev) => chipsWrap.addEventListener(ev, stopAutoScroll, { passive: true }));
 
 function updateSetup() {
   const n = state.names.length;
@@ -635,9 +657,12 @@ function updateSetup() {
 }
 
 function setNames(text, animate) {
+  stopAutoScroll();
   state.names = parseNames(text);
   updateSetup();
   renderChips(animate);
+  // 札が出そろってから1秒待って、自動スクロールを始める
+  if (animate) startAutoScroll(Math.min(state.names.length * 35, 1200) + 350 + 1000);
 }
 
 let toastTimer = 0;
@@ -670,6 +695,7 @@ $('pasteBtn').addEventListener('click', async () => {
 });
 
 function openEditor(hint) {
+  stopAutoScroll();
   $('editHint').textContent = hint || '1行に1名ずつ入力します。空行や前後のスペースは自動で無視します。';
   namesEl.value = state.names.join('\n');
   $('editModal').hidden = false;
@@ -1540,7 +1566,7 @@ function drawResult(now) {
   ctx.fillText(state.winners.length + '人目の当選者', 0, ry + rh / 2 + 2);
 
   // 名前
-  const f = fitText(ctx, name, 560, 124, 44, 900);
+  const f = fitText(ctx, name, 560, 124, 30, 900);
   ctx.fillStyle = COL.navy;
   ctx.fillText(f.text, 0, -12);
   ctx.font = font(54, 800);
@@ -1570,10 +1596,11 @@ function drawList(now) {
   const t = (now - state.listAt) / 1000;
   const count = state.winners.length;
   const top = 352;
-  const rowH = Math.min(100, (1136 - top) / count);
+  const rowH = Math.min(100, (990 - top) / count); // 下にCongratulations!を出す場所を空けておく
   const boxH = rowH - 12;
+  const panelBottom = top + count * rowH + 28;
   drawParticles();
-  roundRect(ctx, 30, 256, 660, top - 256 + count * rowH + 28, 30);
+  roundRect(ctx, 30, 256, 660, panelBottom - 256, 30);
   ctx.fillStyle = 'rgba(3,18,40,0.55)';
   ctx.fill();
   ctx.lineWidth = 3;
@@ -1582,9 +1609,9 @@ function drawList(now) {
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = font(40, 900);
+  ctx.font = font(44, 900);
   ctx.fillStyle = COL.gold2;
-  ctx.fillText('ハーバー当選 おめでとう！', CX, 310);
+  ctx.fillText('当選者発表', CX, 310);
 
   for (let i = 0; i < count; i++) {
     const e = easeOutCubic(clamp01((t - 0.3 - i * 0.25) / 0.4));
@@ -1618,6 +1645,75 @@ function drawList(now) {
     ctx.fillText('さん', 236 + nameW + 8, y + boxH / 2 + 3);
     ctx.restore();
   }
+  // 全員が並び終わってから「Congratulations!」を出す
+  drawCongrats(now, t - (0.3 + (count - 1) * 0.25 + 0.7), panelBottom + 105);
+}
+
+const SCRIPT_FONT = '"Snell Roundhand","Apple Chancery","Brush Script MT",Georgia,serif';
+
+function drawSparkle(x, y, r, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#fffbe0';
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.quadraticCurveTo(x, y, x, y + r);
+  ctx.quadraticCurveTo(x, y, x - r, y);
+  ctx.quadraticCurveTo(x, y, x, y - r);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCongrats(now, t, cy) {
+  if (t <= 0) return;
+  const k = clamp01(t / 0.7);
+  const s = Math.max(0.02, easeOutBack(k));
+  ctx.save();
+  ctx.translate(CX, cy);
+  ctx.scale(s, s);
+  ctx.globalAlpha = Math.min(1, k * 1.5);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  let size = 110;
+  ctx.font = '700 ' + size + 'px ' + SCRIPT_FONT;
+  const w = ctx.measureText('Congratulations!').width;
+  if (w > 640) {
+    size = Math.floor(size * 640 / w);
+    ctx.font = '700 ' + size + 'px ' + SCRIPT_FONT;
+  }
+  const half = Math.min(w, 640) / 2;
+  // 金色の上を光が流れるグラデーション
+  const shine = ((now / 2200) % 1.6) - 0.3;
+  const g = ctx.createLinearGradient(-half, 0, half, 0);
+  g.addColorStop(0, '#c8952a');
+  g.addColorStop(clamp01(shine - 0.12), '#f6d77a');
+  g.addColorStop(clamp01(shine), '#fffbe0');
+  g.addColorStop(clamp01(shine + 0.12), '#f6d77a');
+  g.addColorStop(1, '#c8952a');
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = COL.navy;
+  ctx.strokeText('Congratulations!', 0, 0);
+  ctx.shadowColor = 'rgba(246,215,122,0.8)';
+  ctx.shadowBlur = 22;
+  ctx.fillStyle = g;
+  ctx.fillText('Congratulations!', 0, 0);
+  ctx.shadowBlur = 0;
+  ctx.fillText('Congratulations!', 0, 0);
+
+  [[-300, -55, 16], [290, -62, 20], [-230, 50, 12], [320, 42, 14], [30, -80, 12], [-345, 10, 10]].forEach(([x, y, r], i) => {
+    drawSparkle(x, y, r, 0.35 + 0.65 * Math.abs(Math.sin(now / 420 + i * 1.3)));
+  });
+
+  ctx.globalAlpha = clamp01((t - 0.4) / 0.5);
+  ctx.font = font(40, 900);
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = COL.navy;
+  ctx.strokeText('当選おめでとうございます！', 0, 82);
+  ctx.fillStyle = COL.white;
+  ctx.fillText('当選おめでとうございます！', 0, 82);
+  ctx.restore();
 }
 
 function render(now) {
@@ -1781,6 +1877,7 @@ document.addEventListener('visibilitychange', () => {
 
 $('goBtn').addEventListener('click', () => {
   if ($('goBtn').disabled) return;
+  stopAutoScroll();
   Sound.ensure();
   requestWakeLock();
   state.bgmOn = $('bgmToggle').checked;
