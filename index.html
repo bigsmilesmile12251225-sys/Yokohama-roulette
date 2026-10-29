@@ -246,6 +246,8 @@
     font-weight: 800;
   }
   .sub-btn.save { background: var(--gold); border-color: var(--gold2); color: var(--navy); }
+  .sub-btn.bgm { flex: 0 0 auto; padding: 0 14px; }
+  .sub-btn.bgm[aria-pressed="false"] { opacity: .6; }
   [hidden] { display: none !important; }
 
   /* ---------- 動画モーダル ---------- */
@@ -311,7 +313,18 @@
 
   <section class="card">
     <div class="switch-row">
-      <h2 style="margin:0"><span>③ 録画モード</span></h2>
+      <h2 style="margin:0"><span>③ BGM</span></h2>
+      <label class="switch">
+        <input id="bgmToggle" type="checkbox" aria-label="BGM" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="help">港をイメージしたゆったりしたBGMを流します。ルーレットが回っている間はBGMを止めて、ドラムロールで盛り上げます。抽選画面の「BGM」ボタンでも切り替えられます。</p>
+  </section>
+
+  <section class="card">
+    <div class="switch-row">
+      <h2 style="margin:0"><span>④ 録画モード</span></h2>
       <label class="switch">
         <input id="recToggle" type="checkbox" aria-label="録画モード">
         <span class="slider"></span>
@@ -346,6 +359,7 @@
     <button id="mainBtn" class="go-btn" type="button">スタート</button>
     <div class="sub-row">
       <button id="saveBtn" class="sub-btn save" type="button" hidden>動画を保存</button>
+      <button id="bgmBtn" class="sub-btn bgm" type="button" aria-pressed="true">♪ BGM オン</button>
       <button id="resetBtn" class="sub-btn" type="button">最初からやり直す</button>
     </div>
   </div>
@@ -423,6 +437,7 @@ const state = {
   resultAt: 0,
   listAt: 0,
   recordMode: false,
+  bgmOn: true,
   wheel: null,
   particles: []
 };
@@ -642,6 +657,49 @@ const Sound = {
     o.start(start); o.stop(start + 0.85);
   },
 
+  // 回転中のドラムロール（ノイズを細かく刻み、だんだん大きくする）
+  drumrollStart(duration) {
+    if (!this.ready()) return;
+    this.drumrollStop();
+    const c = this.ctx, t = c.currentTime;
+    const src = c.createBufferSource();
+    src.buffer = this.noise;
+    src.loop = true;
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 2200;
+    bp.Q.value = 0.7;
+    // 下降のこぎり波で音量を揺らし、スネアを連打しているように聞かせる
+    const am = c.createGain();
+    am.gain.value = 0.5;
+    const lfo = c.createOscillator();
+    lfo.type = 'sawtooth';
+    lfo.frequency.setValueAtTime(15, t);
+    lfo.frequency.linearRampToValueAtTime(22, t + duration);
+    const lfoDepth = c.createGain();
+    lfoDepth.gain.value = -0.5;
+    lfo.connect(lfoDepth); lfoDepth.connect(am.gain);
+    const env = c.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.12, t + 0.3);
+    env.gain.linearRampToValueAtTime(0.32, t + duration);
+    src.connect(bp); bp.connect(am); am.connect(env); env.connect(this.master);
+    src.start(t); lfo.start(t);
+    this.roll = { src: src, lfo: lfo, env: env };
+  },
+
+  drumrollStop() {
+    if (!this.roll) return;
+    const { src, lfo, env } = this.roll;
+    this.roll = null;
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    env.gain.cancelScheduledValues(t);
+    env.gain.setValueAtTime(env.gain.value, t);
+    env.gain.linearRampToValueAtTime(0.0001, t + 0.08);
+    src.stop(t + 0.1); lfo.stop(t + 0.1);
+  },
+
   // オリジナルのファンファーレ風フレーズ
   fanfare() {
     if (!this.ready()) return;
@@ -664,10 +722,194 @@ const Sound = {
 };
 
 /* =========================================================
+   BGM（港をイメージしたゆったりした3拍子のオリジナル曲を合成）
+   ========================================================= */
+const Bgm = {
+  BPM: 84,
+  LOOP_BEATS: 24, // 3拍子×8小節
+  VOLUME: 0.32,
+  events: null, gain: null, wave: null, timer: 0, loopStart: 0, idx: 0, playing: false,
+
+  // 曲データ：[拍, 種類, 音名, 長さ(拍)]
+  buildSong() {
+    const f = (name) => {
+      const m = /^([A-G])(#?)(\d)$/.exec(name);
+      const semi = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] ? 1 : 0);
+      return 440 * Math.pow(2, (semi + (Number(m[3]) - 4) * 12 - 9) / 12);
+    };
+    const ev = [];
+    // コード進行（1小節ずつ）：低音と、波のように上下するアルペジオ
+    const chords = [
+      ['C3', ['C4', 'G4', 'E5', 'G4', 'C5', 'G4']],
+      ['A2', ['A3', 'E4', 'C5', 'E4', 'A4', 'E4']],
+      ['F2', ['F3', 'C4', 'A4', 'C4', 'F4', 'C4']],
+      ['G2', ['G3', 'D4', 'B4', 'D4', 'G4', 'D4']],
+      ['C3', ['C4', 'G4', 'E5', 'G4', 'C5', 'G4']],
+      ['A2', ['A3', 'E4', 'C5', 'E4', 'A4', 'E4']],
+      ['D3', ['D4', 'A4', 'F4', 'G3', 'D4', 'B4']],
+      ['C3', ['C4', 'G4', 'E4', 'G4', 'C5', 'G4']]
+    ];
+    chords.forEach(([bass, arp], bar) => {
+      const b0 = bar * 3;
+      ev.push([b0, 'bass', f(bass), 2.8]);
+      arp.forEach((n, i) => ev.push([b0 + i * 0.5, 'harp', f(n), 1.2]));
+    });
+    // メロディ
+    const melody = [
+      ['E5', 2], ['D5', 1], ['C5', 2], ['A4', 1], ['C5', 1], ['D5', 1], ['F5', 1], ['E5', 2], ['D5', 1],
+      ['E5', 2], ['G5', 1], ['A5', 2], ['G5', 1], ['F5', 1], ['E5', 1], ['D5', 1], ['C5', 3]
+    ];
+    let b = 0;
+    for (const [n, d] of melody) { ev.push([b, 'lead', f(n), d]); b += d; }
+    ev.sort((x, y) => x[0] - y[0]);
+    return ev;
+  },
+
+  init() {
+    const c = Sound.ctx;
+    if (!c || this.gain) return;
+    this.events = this.buildSong();
+    this.gain = c.createGain();
+    this.gain.gain.value = 0.0001;
+    this.gain.connect(Sound.master);
+  },
+
+  play(e, t) {
+    const c = Sound.ctx;
+    const beat = 60 / this.BPM;
+    const [, kind, freq, len] = e;
+    const dur = len * beat;
+    const o = c.createOscillator();
+    const g = c.createGain();
+    if (kind === 'harp') {
+      o.type = 'triangle';
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    } else if (kind === 'bass') {
+      o.type = 'sine';
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.3, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    } else {
+      // フルートのようなやわらかい音（少しビブラート）
+      o.type = 'sine';
+      const vib = c.createOscillator();
+      const vibDepth = c.createGain();
+      vib.frequency.value = 5;
+      vibDepth.gain.value = freq * 0.006;
+      vib.connect(vibDepth); vibDepth.connect(o.frequency);
+      vib.start(t); vib.stop(t + dur + 0.1);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.2, t + 0.06);
+      g.gain.setValueAtTime(0.2, t + dur * 0.7);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.05);
+    }
+    o.frequency.value = freq;
+    o.connect(g); g.connect(this.gain);
+    o.start(t); o.stop(t + dur + 0.1);
+  },
+
+  // 少し先までの音をまとめて予約する
+  schedule() {
+    const c = Sound.ctx;
+    const beat = 60 / this.BPM;
+    const horizon = c.currentTime + 0.4;
+    for (;;) {
+      const e = this.events[this.idx];
+      const t = this.loopStart + e[0] * beat;
+      if (t > horizon) break;
+      if (t >= c.currentTime - 0.05) this.play(e, t);
+      this.idx++;
+      if (this.idx >= this.events.length) {
+        this.idx = 0;
+        this.loopStart += this.LOOP_BEATS * beat;
+      }
+    }
+  },
+
+  // 波の音（ゆっくり大きくなったり小さくなったりするノイズ）
+  startWave() {
+    const c = Sound.ctx;
+    const src = c.createBufferSource();
+    src.buffer = Sound.noise;
+    src.loop = true;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 450;
+    const g = c.createGain();
+    g.gain.value = 0.05;
+    const lfo = c.createOscillator();
+    lfo.frequency.value = 0.12;
+    const depth = c.createGain();
+    depth.gain.value = 0.04;
+    lfo.connect(depth); depth.connect(g.gain);
+    src.connect(lp); lp.connect(g); g.connect(this.gain);
+    src.start(); lfo.start();
+    this.wave = { src: src, lfo: lfo };
+  },
+
+  start() {
+    if (!Sound.ready() || this.playing) return;
+    this.init();
+    const c = Sound.ctx;
+    this.playing = true;
+    this.idx = 0;
+    this.loopStart = c.currentTime + 0.1;
+    this.startWave();
+    this.gain.gain.cancelScheduledValues(c.currentTime);
+    this.gain.gain.setValueAtTime(0.0001, c.currentTime);
+    this.gain.gain.linearRampToValueAtTime(this.VOLUME, c.currentTime + 1.2);
+    this.schedule();
+    this.timer = setInterval(() => this.schedule(), 80);
+  },
+
+  stop(fade) {
+    if (!this.playing) return;
+    this.playing = false;
+    clearInterval(this.timer);
+    const c = Sound.ctx;
+    const t = c.currentTime;
+    const end = t + (fade === undefined ? 0.5 : fade);
+    this.gain.gain.cancelScheduledValues(t);
+    this.gain.gain.setValueAtTime(this.gain.gain.value, t);
+    this.gain.gain.linearRampToValueAtTime(0.0001, end);
+    if (this.wave) {
+      this.wave.src.stop(end + 0.05);
+      this.wave.lfo.stop(end + 0.05);
+      this.wave = null;
+    }
+  }
+};
+
+// 今の場面でBGMを流すべきかどうかに合わせて、再生・停止する
+let bgmResumeTimer = 0;
+function syncBgm() {
+  clearTimeout(bgmResumeTimer);
+  const quietPhase = state.phase === 'setup' || state.phase === 'spinning' || state.phase === 'stopping';
+  if (!state.bgmOn || quietPhase) {
+    Bgm.stop(state.phase === 'spinning' ? 0.4 : 0.5);
+  } else if (Sound.ready()) {
+    Bgm.start();
+  } else if (Sound.ctx) {
+    // iPhoneでは音の再開が少し遅れることがあるので、再開を待ってから流す
+    Sound.ctx.resume().then(() => { if (Sound.ready()) syncBgm(); }).catch(() => {});
+  }
+}
+
+function updateBgmButton() {
+  const b = $('bgmBtn');
+  b.textContent = state.bgmOn ? '♪ BGM オン' : '♪ BGM オフ';
+  b.setAttribute('aria-pressed', String(state.bgmOn));
+}
+
+/* =========================================================
    録画（canvas.captureStream + MediaRecorder）
    ========================================================= */
 const Rec = {
   support: null, recorder: null, chunks: [], blob: null, url: null, file: null,
+  // Safariでは録画中にストリームが回収されると映像だけ止まるため、終了まで参照を保持する
+  stream: null, videoTrack: null, audioTrack: null,
   filename: '', active: false, discarded: false, interrupted: false,
 
   detect() {
@@ -700,12 +942,15 @@ const Rec = {
       const stream = canvas.captureStream(30);
       const audio = Sound.getRecordTrack();
       if (audio) stream.addTrack(audio);
-      const opts = { videoBitsPerSecond: 4000000, audioBitsPerSecond: 128000 };
+      this.stream = stream;
+      this.videoTrack = stream.getVideoTracks()[0] || null;
+      this.audioTrack = audio;
+      const opts = { videoBitsPerSecond: 2500000, audioBitsPerSecond: 128000 };
       if (this.support.mime) opts.mimeType = this.support.mime;
       let r;
       try { r = new MediaRecorder(stream, opts); } catch (e) { r = new MediaRecorder(stream); }
       r.ondataavailable = (e) => { if (e.data && e.data.size > 0) this.chunks.push(e.data); };
-      r.onstop = () => this.finish(stream);
+      r.onstop = () => this.finish();
       r.onerror = () => {
         showCtrlMsg('録画中にエラーが発生しました。iPhoneの「画面収録」をご利用ください。', true);
       };
@@ -714,6 +959,7 @@ const Rec = {
       this.active = true;
       return true;
     } catch (e) {
+      this.releaseStream();
       this.recorder = null;
       this.active = false;
       return false;
@@ -724,8 +970,13 @@ const Rec = {
     if (this.recorder && this.recorder.state !== 'inactive') this.recorder.stop();
   },
 
-  finish(stream) {
-    stream.getTracks().forEach((t) => t.stop());
+  releaseStream() {
+    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    this.stream = null; this.videoTrack = null; this.audioTrack = null;
+  },
+
+  finish() {
+    this.releaseStream();
     this.active = false;
     if (this.discarded) { this.chunks = []; return; }
     const mime = ((this.recorder && this.recorder.mimeType) || this.support.mime || 'video/mp4').split(';')[0];
@@ -1344,6 +1595,7 @@ function boundaryCount(rot, a) {
 }
 
 function startSpin() {
+  if (state.phase !== 'ready') return; // 録画開始待ちの間にリセットされた場合
   const n = state.candidates.length;
   const a = TAU / n;
   const winner = randomInt(n);             // 当選者をここで決める
@@ -1362,6 +1614,8 @@ function startSpin() {
   };
   state.lastTick = boundaryCount(start, a);
   state.phase = 'spinning';
+  syncBgm();
+  Sound.drumrollStart(state.spin.duration / 1000);
   updateControls();
 }
 
@@ -1374,6 +1628,7 @@ function segmentAtPointer(rot, n) {
 
 function onSpinEnd() {
   state.phase = 'stopping';
+  Sound.drumrollStop();
   setTimeout(() => {
     if (state.phase !== 'stopping') return;
     const idx = segmentAtPointer(state.rot, state.candidates.length);
@@ -1382,9 +1637,11 @@ function onSpinEnd() {
     state.candidates.splice(idx, 1);
     state.resultAt = performance.now();
     state.phase = 'result';
-    spawnParticles(110);
+    spawnParticles(70);
     Sound.fanfare();
     updateControls();
+    // ファンファーレが終わってからBGMを再開する
+    bgmResumeTimer = setTimeout(() => { if (state.phase === 'result' || state.phase === 'list') syncBgm(); }, 2600);
   }, 450);
 }
 
@@ -1506,6 +1763,8 @@ $('goBtn').addEventListener('click', () => {
   Sound.ensure();
   requestWakeLock();
   state.recordMode = $('recToggle').checked && Rec.support.ok;
+  state.bgmOn = $('bgmToggle').checked;
+  updateBgmButton();
   state.candidates = state.names.slice();
   state.winners = [];
   state.rot = randomFloat() * TAU;
@@ -1522,6 +1781,15 @@ $('goBtn').addEventListener('click', () => {
   updateControls();
   requestAnimationFrame(() => { fitStage(); setTimeout(fitStage, 300); });
   if (!rafId) { lastFrame = 0; rafId = requestAnimationFrame(loop); }
+  syncBgm();
+});
+
+$('bgmBtn').addEventListener('click', () => {
+  Sound.ensure();
+  state.bgmOn = !state.bgmOn;
+  $('bgmToggle').checked = state.bgmOn;
+  updateBgmButton();
+  syncBgm();
 });
 
 mainBtn.addEventListener('click', () => {
@@ -1547,7 +1815,7 @@ mainBtn.addEventListener('click', () => {
     } else {
       state.phase = 'list';
       state.listAt = performance.now();
-      spawnParticles(70);
+      spawnParticles(50);
       if (Rec.active) {
         showCtrlMsg('録画を仕上げています…（あと数秒）');
         // 一覧が全員表示されてから少し余韻を残して録画を止める
@@ -1556,6 +1824,7 @@ mainBtn.addEventListener('click', () => {
       }
     }
     updateControls();
+    syncBgm();
   }
 });
 
@@ -1582,6 +1851,8 @@ $('resetBtn').addEventListener('click', () => {
   rafId = 0;
   state.phase = 'setup';
   state.spin = null;
+  Sound.drumrollStop();
+  syncBgm();
   state.winners = [];
   state.candidates = [];
   state.particles = [];
