@@ -475,6 +475,41 @@ function randomFloat() {
 }
 
 /* =========================================================
+   録画用：URLの#以降で当選の順番を指定する（#x=...）
+   名前はリポジトリに書かず、サーバーにも送られない#以降で受け取る。
+   指定がなければ、これまでどおり完全ランダムで抽選する。
+   ========================================================= */
+function readFixedOrder() {
+  const m = /[#&]x=([A-Za-z0-9_-]+)/.exec(location.hash);
+  if (!m) return [];
+  try {
+    const b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
+    const json = new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+    const list = JSON.parse(json).w;
+    return Array.isArray(list) ? list.map(String) : [];
+  } catch (e) {
+    return [];
+  }
+}
+const fixedOrder = readFixedOrder();
+
+// スペースや全角・半角の違いを無視して比べる
+const looseKey = (s) => s.normalize('NFKC').replace(/\s+/g, '');
+
+// 指定があれば、その回の人がちょうど1人見つかったときだけその人に。それ以外はランダム
+function pickWinnerIndex(n) {
+  const want = fixedOrder[state.winners.length];
+  if (want) {
+    const key = looseKey(want);
+    const hits = [];
+    state.candidates.forEach((c, i) => { if (looseKey(c).includes(key)) hits.push(i); });
+    if (hits.length === 1) return hits[0];
+  }
+  return randomInt(n);
+}
+
+/* =========================================================
    状態
    ========================================================= */
 const state = {
@@ -1723,7 +1758,7 @@ function startSpin() {
   if (state.phase !== 'ready') return;
   const n = state.candidates.length;
   const a = TAU / n;
-  const winner = randomInt(n);             // 当選者をここで決める
+  const winner = pickWinnerIndex(n);       // 当選者をここで決める
   const offset = 0.12 + 0.76 * randomFloat(); // 区画内のどこで止まるか（境目は避ける）
   const spins = 5 + randomInt(3);          // 5〜7周
   const start = state.rot;
